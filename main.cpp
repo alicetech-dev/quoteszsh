@@ -223,17 +223,60 @@ std::string getAiGeneratedQuote(bool isLocalOllama = false, const std::string& o
     std::string sourceApiName = isLocalOllama ? "Ollama (" + ollamaModelFromCaller + ")" : "OpenRouter";
     // std::cerr << "[Debug] Intentando API: " << sourceApiName << std::endl; // Mensaje de depuración opcional
 
+    // En getAiGeneratedQuote()
+
     std::vector<std::string> promptCategories = {
+        // Motivacionales y Generales
         "Dame una frase motivacional muy corta, inspiradora y original para empezar el día. Idealmente, no más de 15 palabras.",
-        "Escribe una cita corta, ingeniosa o un hecho curioso breve sobre Linux. No más de 20 palabras.",
-        "Proporciona un pensamiento breve y profundo sobre la programación o el desarrollo de software. Máximo 20 palabras.",
-        "Genera una frase corta y memorable sobre la ciberseguridad o la privacidad en línea. Límite 15 palabras.",
-        "Dame un consejo conciso sobre productividad para alguien que trabaja con ordenadores. Menos de 20 palabras.",
-        "Una frase corta y reflexiva sobre el impacto de la tecnología en la sociedad. No más de 20 palabras.",
-        "Un dato curioso y breve sobre la historia de la informática. Máximo 20 palabras.",
+        "Un pensamiento breve y positivo para afrontar cualquier desafío. Máximo 20 palabras.",
+        "Una reflexión concisa sobre la importancia del aprendizaje continuo. Menos de 20 palabras.",
+
+        // Linux y Sistemas Operativos
+        "Escribe una cita corta, ingeniosa o un hecho curioso breve sobre el kernel de Linux. No más de 20 palabras.",
+        "Una frase memorable sobre la filosofía del software libre o el movimiento open source. Límite 15 palabras.",
+        "Un dato curioso sobre la historia de Unix o sus derivados. Breve y conciso.",
         "Una cita inspiradora sobre Debian GNU/Linux. Corta y al grano.",
         "Describe en una frase corta y poética la belleza de un sistema operativo bien diseñado.",
-        "Un haiku sobre código limpio."
+        "Un pensamiento breve sobre la línea de comandos (CLI) y su poder.",
+
+        // Programación y Desarrollo de Software
+        "Proporciona un pensamiento breve y profundo sobre la programación o el desarrollo de software. Máximo 20 palabras.",
+        "Un haiku sobre código limpio y elegante.",
+        "Un chiste corto de programadores (apto para todos los públicos).",
+        "Una frase corta sobre la naturaleza de los 'bugs' en el software.",
+        "Un consejo breve pero útil para depurar código eficientemente.",
+        "Una reflexión sobre la importancia de la elección de un buen algoritmo.",
+        "Una cita célebre (o inventada que suene célebre) de un programador ficticio sobre su lenguaje favorito. Corta.",
+        "¿Cuál es la diferencia entre un buen programador y uno excelente? Responde en una frase corta.",
+
+        // Ingeniería Informática y Conceptos Técnicos
+        "Explica un concepto complejo de redes de computadoras en una frase muy simple y memorable.",
+        "Una frase corta sobre la importancia de la arquitectura de computadoras.",
+        "Un pensamiento breve sobre el futuro de la inteligencia artificial. Máximo 20 palabras.",
+        "Una reflexión concisa sobre la computación cuántica y su potencial.",
+
+        // Ciberseguridad y Privacidad
+        "Genera una frase corta y memorable sobre la ciberseguridad o la importancia de la privacidad en línea. Límite 15 palabras.",
+        "Un consejo breve y práctico para mejorar la seguridad digital personal.",
+
+        // Historia de la Informática y Anécdotas
+        "Un dato curioso y breve sobre la historia de la informática o un pionero/pionera importante. Máximo 25 palabras.",
+        "Una anécdota ficticia (pero plausible) muy corta sobre los primeros días de la programación. Con un toque de humor si es posible.",
+        "Nombra una figura histórica de la informática y una frase corta que podría haber dicho. (Ej: Ada Lovelace)",
+        "Un hecho poco conocido sobre el desarrollo de ARPANET o los inicios de Internet. Breve.",
+
+        // Memes y Cultura Geek (con cuidado, la IA puede no entenderlos bien o ser muy literal)
+        "Genera una frase corta y humorística que podría ser un meme de programadores. Apto para la terminal.",
+        "Una referencia sutil a un meme popular de la cultura de internet, adaptada como una frase corta y sabia.",
+        "Imagina que un personaje de Star Trek da un consejo sobre sistemas. Frase corta.",
+
+        // Productividad y Trabajo con Ordenadores
+        "Dame un consejo conciso sobre productividad para alguien que trabaja con ordenadores. Menos de 20 palabras.",
+        "Una frase corta para recordar la importancia de los descansos al trabajar frente a la pantalla.",
+
+        // Filosofía y Tecnología
+        "Una frase corta y reflexiva sobre el impacto de la tecnología en la sociedad.",
+        "Un pensamiento breve sobre la ética en la inteligencia artificial."
     };
     std::random_device rdPrompt;
     std::mt19937 genPrompt(rdPrompt());
