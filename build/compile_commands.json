@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/home/alice/CLionProjects/quoteszsh/build",
+  "command": "/usr/bin/g++ -DCPPHTTPLIB_BROTLI_SUPPORT -DCPPHTTPLIB_OPENSSL_SUPPORT -DCPPHTTPLIB_ZLIB_SUPPORT -I/home/alice/CLionProjects/quoteszsh/build/_deps/nlohmann_json-src/include -isystem /home/alice/CLionProjects/quoteszsh/build/_deps/cpphttplib-src -g -std=gnu++20 -o CMakeFiles/quoteszsh.dir/main.cpp.o -c /home/alice/CLionProjects/quoteszsh/main.cpp",
+  "file": "/home/alice/CLionProjects/quoteszsh/main.cpp",
+  "output": "CMakeFiles/quoteszsh.dir/main.cpp.o"
+}
+]
