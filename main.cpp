@@ -331,21 +331,23 @@ std::string cleanAiResponse(std::string text) {
 }
 
 // --- FUNCIÓN PARA OBTENER CITA DE LA IA (CON GENERADORES ALEATORIOS ESTÁTICOS PARA PROMPTS) ---
-std::string getAiGeneratedQuote(bool isLocalOllama = false, const std::string& ollamaModelFromCaller = "qwen3-4b-abliterated-nothink:latest") {
+std::string getAiGeneratedQuote(bool isLocalOllama = false, const std::string& ollamaModelFromCaller = "gemma3:12b" /* Revisa si este nombre de modelo es correcto para tu Ollama */) {
     // Generadores aleatorios estáticos para la selección de prompts
     static std::random_device rd_prompt_device;
-    static std::mt19937 gen_prompt(rd_prompt_device());
-    static std::uniform_int_distribution<size_t> distrib_prompt(
+    static std::mt19937 gen_prompt(rd_prompt_device()); // <--- Aseguramos que gen_prompt esté aquí
+    static std::uniform_int_distribution<size_t> distrib_prompt( // <--- Aseguramos que distrib_prompt esté aquí
         0, PROMPT_CATEGORIES.empty() ? 0 : PROMPT_CATEGORIES.size() - 1);
 
     std::string user_prompt;
     if (!PROMPT_CATEGORIES.empty()) {
-        user_prompt = PROMPT_CATEGORIES[distrib_prompt(gen_prompt)];
+        user_prompt = PROMPT_CATEGORIES[distrib_prompt(gen_prompt)]; // <--- Uso de las variables estáticas
     } else {
         user_prompt = "Dame una frase corta interesante.";
     }
 
-    std::string endpointHost;
+    // MODIFICACIÓN 1: Separar host/IP y puerto (tal como lo tenías después de mi sugerencia anterior)
+    std::string target_host_or_ip;
+    int target_port = 0; // Usado solo para Ollama (HTTP)
     std::string endpointPath;
     httplib::Headers headers;
     json payload;
@@ -355,7 +357,8 @@ std::string getAiGeneratedQuote(bool isLocalOllama = false, const std::string& o
     });
 
     if (isLocalOllama) {
-        endpointHost = "localhost";
+        target_host_or_ip = "201.236.177.37"; // Solo la IP
+        target_port = 11434;                 // El puerto
         endpointPath = "/api/chat";
         payload["model"] = ollamaModelFromCaller;
         headers.emplace("Content-Type", "application/json");
@@ -365,41 +368,42 @@ std::string getAiGeneratedQuote(bool isLocalOllama = false, const std::string& o
         if (apiKey.empty()) {
             return "Error_API_KEY";
         }
-        endpointHost = "openrouter.ai";
+        target_host_or_ip = "openrouter.ai"; // Solo el host
         endpointPath = "/api/v1/chat/completions";
         headers = {
             {"Authorization", "Bearer " + apiKey},
             {"Content-Type", "application/json"}
         };
-        payload["model"] = "qwen/qwq-32b:free"; // Modelo para OpenRouter
+        payload["model"] = "qwen/qwq-32b:free"; // O tu modelo "qwen/qwq-32b:free" si te funciona
+        payload["stream"] = false;
     }
 
     httplib::Result response_result;
-    if (isLocalOllama) {
-        httplib::Client client(endpointHost, 11434);
-        client.set_connection_timeout(10, 0);
-        client.set_read_timeout(60, 0);
-        client.set_write_timeout(10, 0);
-        std::string payloadStr = payload.dump();
-        response_result = client.Post(endpointPath.c_str(), headers, payloadStr, "application/json");
-    } else {
-        httplib::SSLClient client(endpointHost.c_str());
-        client.set_connection_timeout(10, 0);
-        client.set_read_timeout(30, 0);
-        client.set_write_timeout(10, 0);
-        std::string payloadStr = payload.dump();
-        response_result = client.Post(endpointPath.c_str(), headers, payloadStr, "application/json");
-    }
+    try { // El bloque try comienza aquí y engloba toda la lógica de petición y parseo
+        if (isLocalOllama) {
+            httplib::Client client(target_host_or_ip, target_port);
+            client.set_connection_timeout(10, 0);
+            client.set_read_timeout(60, 0);
+            client.set_write_timeout(10, 0);
+            std::string payloadStr = payload.dump();
+            response_result = client.Post(endpointPath.c_str(), headers, payloadStr, "application/json");
+        } else {
+            httplib::SSLClient client(target_host_or_ip.c_str());
+            client.set_connection_timeout(10, 0);
+            client.set_read_timeout(30, 0);
+            client.set_write_timeout(10, 0);
+            std::string payloadStr = payload.dump();
+            response_result = client.Post(endpointPath.c_str(), headers, payloadStr, "application/json");
+        }
 
-    if (!response_result) {
-        auto err_code = response_result.error();
-        // No imprimimos a std::cerr aquí, solo devolvemos el código de error
-        return isLocalOllama ? "Error_OLLAMA_CONNECTION" : "Error_OPENROUTER_CONNECTION";
-    }
+        if (!response_result) {
+            // httplib::Error err = response_result.error(); // Para depuración
+            // std::cerr << "Error de conexión httplib: " << httplib::to_string(err) << std::endl;
+            return isLocalOllama ? "Error_OLLAMA_CONNECTION" : "Error_OPENROUTER_CONNECTION";
+        }
 
-    if (response_result->status == 200) {
-        try {
-            json jsonResponse = json::parse(response_result->body);
+        if (response_result->status == 200) {
+            json jsonResponse = json::parse(response_result->body); // Esta línea puede lanzar json::parse_error
             std::string content;
             if (jsonResponse.contains("choices") && jsonResponse["choices"].is_array() && !jsonResponse["choices"].empty()) {
                 const auto& firstChoice = jsonResponse["choices"][0];
@@ -421,22 +425,41 @@ std::string getAiGeneratedQuote(bool isLocalOllama = false, const std::string& o
             if (!content.empty()) {
                 return content;
             }
-            // No imprimimos el JSON aquí para mantener los errores concisos en main
-            return "Error_FORMAT";
-        } catch (const json::parse_error& e) {
-            // No imprimimos el body aquí
-            return "Error_PARSE";
-        } catch (const std::exception& e) {
-            return "Error_UNEXPECTED_PROCESSING";
+            return isLocalOllama ? "Error_OLLAMA_EMPTY_OR_BAD_FORMAT" : "Error_OPENROUTER_EMPTY_OR_BAD_FORMAT";
+        } else {
+            if (response_result->status == 429) {
+                return isLocalOllama ? "Error_OLLAMA_API_Status_429" : "Error_OPENROUTER_API_Status_429";
+            }
+            return isLocalOllama ?
+                   "Error_OLLAMA_API_Status_Other_" + std::to_string(response_result->status) :
+                   "Error_OPENROUTER_API_Status_Other_" + std::to_string(response_result->status);
         }
-    } else {
-        if (response_result->status == 429) {
-            return isLocalOllama ? "Error_OLLAMA_API_Status_429" : "Error_OPENROUTER_API_Status_429";
-        }
-        // No incluimos el cuerpo del error aquí para ser concisos
-        return isLocalOllama ? "Error_OLLAMA_API_Status_Other" : "Error_OPENROUTER_API_Status_Other";
+    } // <<<<<<<<<<< ESTA ES LA LLAVE DE CIERRE CORRECTA DEL BLOQUE 'try'
+    catch (const json::parse_error& e) { // Primer catch para errores de parseo de JSON
+        // std::cerr << "Error de parseo JSON: " << e.what() << std::endl;
+        // if (response_result && !response_result->body.empty() && response_result->body.length() < 1000) {
+        //    std::cerr << "Cuerpo de la respuesta causando error de parseo: " << response_result->body << std::endl;
+        // }
+        return "Error_PARSE"; // Tu código original tenía "Error_PARSE"
+    } catch (const httplib::Error& e) { // CORREGIDO: Usar httplib::Error o httplib::Exception según la versión de httplib.
+                                         // httplib::Error es más común para errores de conexión/bajo nivel.
+                                         // httplib::Exception puede ser una clase base. Prueba con httplib::Error primero.
+                                         // Si httplib::Error no funciona, revisa la documentación de tu versión de cpp-httplib para la clase de excepción correcta.
+        // std::cerr << "Excepción de httplib: " << e.what();
+        // if (e.code != httplib::Error::Success) { // httplib::Error tiene un miembro 'code'
+        //    std::cerr << " (código: " << static_cast<int>(e.code) << ")";
+        // }
+        // std::cerr << std::endl;
+        // Devolver un código de error más genérico o uno basado en e.code si es necesario
+        return "Error_HTTPLIB_ERROR"; // O algo como "Error_HTTPLIB_EXCEPTION_" + std::to_string(static_cast<int>(e.code));
     }
-    return "Error_UNHANDLED";
+    catch (const std::exception& e) { // Captura genérica para otras excepciones estándar
+        // std::cerr << "Excepción inesperada: " << e.what() << std::endl;
+        return "Error_UNEXPECTED_PROCESSING"; // Tu código original tenía esto
+    }
+    // Este return es por si alguna lógica futura no devuelve valor, pero con la estructura actual,
+    // uno de los returns dentro del try o los catch debería ejecutarse.
+    return "Error_UNHANDLED_LOGIC_PATH";
 }
 
 // --- FUNCIÓN MAIN (CON LÓGICA DE FALLBACK INVERTIDA Y MENSAJES CONCISOS) ---
@@ -447,7 +470,7 @@ int main() {
     std::string dataSource = "Ninguna"; // Para saber de dónde vino la cita o si es fallback
 
     // 1. INTENTAR CON OLLAMA LOCAL PRIMERO
-    aiQuote = getAiGeneratedQuote(true, "qwen3-4b-abliterated-nothink:latest");
+    aiQuote = getAiGeneratedQuote(true, "gemma3:12b");
 
     if (aiQuote.rfind("Error_", 0) != 0) {
         quoteFetchedSuccessfully = true;
